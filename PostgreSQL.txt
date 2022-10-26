@@ -1,0 +1,524 @@
+1)CREATE OR REPLACE FUNCTION public.update_permission(
+	var_id integer,
+	var_number character varying,
+	var_description text,
+	var_addition text,
+	var_subdivision_id integer,
+	var_untypical_work text,
+	var_emergency_minute integer,
+	var_is_emergency_activation boolean,
+	var_period_start text,
+	var_period_end text)
+    RETURNS void
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE PARALLEL UNSAFE
+AS $BODY$
+begin
+if var_period_start <> '' then
+update permission
+set number = var_number, description = var_description, addition = var_addition,
+subdivisionid = var_subdivision_id, untypical_work = var_untypical_work,
+emergency_minute = var_emergency_minute, is_emergency_activation = var_is_emergency_activation,
+period_start = TO_DATE(var_period_start,'DD-MM-YYYY'), period_end = TO_DATE(var_period_end,'DD-MM-YYYY')
+where permission.id = var_id;
+else 
+update permission
+set number = var_number, description = var_description, addition = var_addition,
+subdivisionid = var_subdivision_id, untypical_work = var_untypical_work,
+emergency_minute = var_emergency_minute, is_emergency_activation = var_is_emergency_activation,
+period_start = NULL, period_end = NULL
+where permission.id = var_id;
+end if;
+end;
+$BODY$;
+
+2)CREATE OR REPLACE FUNCTION public.get_permission(
+	var_permission_id integer,
+	var_number character varying,
+	var_user_id integer,
+	var_search character varying,
+	var_date_start text,
+	var_date_end text,
+	var_status_id integer,
+	var_num_page integer)
+    RETURNS TABLE(id integer, number character varying, description text, addition text, subdivision_name character varying, subdivision_id integer, untypical_work text, status_name character varying, status_id integer, status_management_log_id integer, status_management_log_comment text, date timestamp without time zone, date_change_status timestamp without time zone, emergency_minute integer, is_emergency_activation boolean, period_start text, period_end text) 
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE PARALLEL UNSAFE
+    ROWS 1000
+
+AS $BODY$
+
+BEGIN
+if var_num_page > 0 then 
+		return query select distinct permission.id, permission.number, permission.description, permission.addition,
+		subdivision.name as subdivision_name, subdivision.id as subdivision_id, permission.untypical_work,
+		status.name as status_name, status.id as status_id, sml1.id as status_management_log_id,
+		sml1.comment as status_management_log_comment, sml1.date, sml1.date_change_status, 
+		permission.emergency_minute, permission.is_emergency_activation,
+		(Select to_char(permission.period_start, 'dd.mm.YYYY')), (Select to_char(permission.period_end, 'dd.mm.YYYY'))
+		from permission
+        join user_permission on user_permission.permissionid = permission.id
+		join subdivision on subdivision.id = permission.subdivisionid
+		join status_management_log as sml1 on sml1.permissionid =  permission.id
+		join status on status.id = sml1.statusid
+		where sml1.date = (select max(sml2.date) from status_management_log as sml2
+                               where sml1.permissionid = sml2.permissionid)
+	   order by sml1.date desc
+		limit 8 offset (var_num_page - 1) * 8;
+ elseIF var_permission_id > 0 and var_user_id > 0 THEN
+        return query select distinct permission.id, permission.number, permission.description, permission.addition,
+		subdivision.name as subdivision_name, subdivision.id as subdivision_id, permission.untypical_work,
+		status.name as status_name, status.id as status_id, sml1.id as status_management_log_id,
+		sml1.comment as status_management_log_comment, sml1.date, sml1.date_change_status, 
+		permission.emergency_minute, permission.is_emergency_activation,
+		(Select to_char(permission.period_start, 'dd.mm.YYYY')), (Select to_char(permission.period_end, 'dd.mm.YYYY'))
+		from permission
+		join user_permission on user_permission.permissionid = permission.id
+		join subdivision on subdivision.id = permission.subdivisionid
+		join status_management_log as sml1 on sml1.permissionid =  permission.id
+		join status on status.id = sml1.statusid
+		where permission.id = var_permission_id and user_permission.userid = var_user_id
+        and sml1.date = (select max(sml2.date) from status_management_log as sml2
+                               where sml1.permissionid = sml2.permissionid)
+							      order by sml1.date desc;
+    elseIF var_permission_id > 0 THEN
+        return query select distinct permission.id, permission.number, permission.description, permission.addition,
+		subdivision.name as subdivision_name, subdivision.id as subdivision_id, permission.untypical_work,
+		status.name as status_name, status.id as status_id, sml1.id as status_management_log_id,
+		sml1.comment as status_management_log_comment, sml1.date, sml1.date_change_status, 
+		permission.emergency_minute, permission.is_emergency_activation,
+		(Select to_char(permission.period_start, 'dd.mm.YYYY')), (Select to_char(permission.period_end, 'dd.mm.YYYY'))
+		from permission
+        join user_permission on user_permission.permissionid = permission.id
+		join subdivision on subdivision.id = permission.subdivisionid
+		join status_management_log as sml1 on sml1.permissionid =  permission.id
+		join status on status.id = sml1.statusid
+		where sml1.date = (select max(sml2.date) from status_management_log as sml2
+                               where sml1.permissionid = sml2.permissionid)
+		and permission.id = var_permission_id;
+    elseIF var_status_id > 0 and var_user_id > 0 THEN
+        return query select distinct permission.id, permission.number, permission.description, permission.addition,
+		subdivision.name as subdivision_name, subdivision.id as subdivision_id, permission.untypical_work,
+		status.name as status_name, status.id as status_id, sml1.id as status_management_log_id,
+		sml1.comment as status_management_log_comment, sml1.date, sml1.date_change_status, 
+		permission.emergency_minute, permission.is_emergency_activation,
+		(Select to_char(permission.period_start, 'dd.mm.YYYY')), (Select to_char(permission.period_end, 'dd.mm.YYYY'))
+		from permission
+		join user_permission on user_permission.permissionid = permission.id
+		join subdivision on subdivision.id = permission.subdivisionid
+		join status_management_log as sml1 on sml1.permissionid =  permission.id
+		join status on status.id = sml1.statusid
+		where sml1.date = (select max(sml2.date) from status_management_log as sml2
+                            join status on status.id = sml2.statusid
+                            where sml1.permissionid = sml2.permissionid
+                            and status.type_statusid = 1
+                           )
+              and status.id in (select status_management_log.statusid from status_management_log
+                                where status_management_log.statusid = var_status_id)
+         and user_permission.userid = var_user_id
+         order by sml1.date desc;
+         elseif var_date_start <> '' and var_date_end <> '' and var_user_id > 0 then
+	return query select distinct permission.id, permission.number, permission.description, permission.addition,
+		subdivision.name as subdivision_name, subdivision.id as subdivision_id, permission.untypical_work,
+		status.name as status_name, status.id as status_id, sml1.id as status_management_log_id,
+		sml1.comment as status_management_log_comment, sml1.date, sml1.date_change_status, 
+		permission.emergency_minute, permission.is_emergency_activation,
+		(Select to_char(permission.period_start, 'dd.mm.YYYY')), (Select to_char(permission.period_end, 'dd.mm.YYYY'))
+		from permission
+        join subdivision on subdivision.id = permission.subdivisionid
+		join status_management_log as sml1 on sml1.permissionid =  permission.id
+		join status on status.id = sml1.statusid		
+        join user_permission on user_permission.permissionid = permission.id
+		where sml1.date = (select max(sml2.date) from status_management_log as sml2
+                             join status on status.id = sml2.statusid
+							where sml1.permissionid = sml2.permissionid
+                            and status.type_statusid = 1)
+        and user_permission.type_personid = 1
+		and user_permission.userid = var_user_id and
+		(permission.id in (select permission.id from permission
+				 join date on date.permissionid = permission.id
+				 where date.date >= to_date(var_date_start, 'YYYY-MM-DD') and date.date <= to_date(var_date_end, 'YYYY-MM-DD'))
+               
+		or permission.id in (select permission.id from permission
+			 where permission.period_start <= to_date(var_date_start, 'YYYY-MM-DD') 
+			 and permission.period_end >= to_date(var_date_end, 'YYYY-MM-DD')))
+                 order by sml1.date desc;
+		 elseif var_date_start <> '' and var_date_end <> '' and var_status_id > 0 then
+	return query select distinct permission.id, permission.number, permission.description, permission.addition,
+		subdivision.name as subdivision_name, subdivision.id as subdivision_id, permission.untypical_work,
+		status.name as status_name, status.id as status_id, sml1.id as status_management_log_id,
+		sml1.comment as status_management_log_comment, sml1.date, sml1.date_change_status,
+				permission.emergency_minute, permission.is_emergency_activation,
+				(Select to_char(permission.period_start, 'dd.mm.YYYY')), (Select to_char(permission.period_end, 'dd.mm.YYYY'))
+		from permission
+        join subdivision on subdivision.id = permission.subdivisionid
+		join status_management_log as sml1 on sml1.permissionid =  permission.id
+		join status on status.id = sml1.statusid		
+        join user_permission on user_permission.permissionid = permission.id
+		where sml1.date = (select max(sml2.date) from status_management_log as sml2
+                             join status on status.id = sml2.statusid
+							where sml1.permissionid = sml2.permissionid
+                            and status.type_statusid = 1)
+		and status.id = var_status_id and
+		(permission.id in (select permission.id from permission
+				 join date on date.permissionid = permission.id
+				 where date.date >= to_date(var_date_start, 'YYYY-MM-DD') and date.date <= to_date(var_date_end, 'YYYY-MM-DD'))
+                
+		or permission.id in (select permission.id from permission
+			 where permission.period_start <= to_date(var_date_start, 'YYYY-MM-DD') 
+			 and permission.period_end >= to_date(var_date_end, 'YYYY-MM-DD')))
+                 order by sml1.date desc;
+        elseif var_date_start <> '' and var_date_end <> '' and var_search <> '' then
+	return query select distinct permission.id, permission.number, permission.description, permission.addition,
+		subdivision.name as subdivision_name, subdivision.id as subdivision_id, permission.untypical_work,
+		status.name as status_name, status.id as status_id, sml1.id as status_management_log_id,
+		sml1.comment as status_management_log_comment, sml1.date, sml1.date_change_status,
+		permission.emergency_minute, permission.is_emergency_activation,
+		(Select to_char(permission.period_start, 'dd.mm.YYYY')), (Select to_char(permission.period_end, 'dd.mm.YYYY'))
+		from permission
+		join subdivision on subdivision.id = permission.subdivisionid
+		join status_management_log as sml1 on sml1.permissionid =  permission.id
+		join status on status.id = sml1.statusid		
+        join user_permission on user_permission.permissionid = permission.id
+        join "user" on "user".id = user_permission.userid
+        join type_person on type_person.id = user_permission.type_personid
+		where sml1.date = (select max(sml2.date) from status_management_log as sml2
+                             join status on status.id = sml2.statusid
+							where sml1.permissionid = sml2.permissionid
+                            and status.type_statusid = 1)
+		 and
+        (permission.id in (select permission.id from permission
+				 join date on date.permissionid = permission.id
+				 where date.date >= to_date(var_date_start, 'YYYY-MM-DD') and date.date <= to_date(var_date_end, 'YYYY-MM-DD'))
+                
+		or permission.id in (select permission.id from permission
+			 where permission.period_start <= to_date(var_date_start, 'YYYY-MM-DD') 
+			 and permission.period_end >= to_date(var_date_end, 'YYYY-MM-DD')))
+                 and  ((type_person.id = 3 and (lower("user".name) like lower(var_search) or lower("user".lastname) like lower(var_search) or lower("user".patronymic) like lower(var_search) 
+   or lower(concat("user".lastname, ' ', "user".name)) like lower(var_search)
+  or lower(concat("user".name, ' ', "user".lastname)) like lower(var_search)
+  or lower(concat("user".name, ' ', "user".patronymic)) like lower(var_search)
+    or lower(concat("user".patronymic, ' ', "user".name)) like lower(var_search)
+   or lower(concat("user".lastname, ' ', "user".name, ' ', "user".patronymic)) like lower(var_search)
+     or lower(concat("user".name, ' ', "user".lastname, ' ', "user".patronymic)) like lower(var_search)
+       or lower(concat("user".name, ' ', "user".patronymic, ' ', "user".lastname)) like lower(var_search)
+         or lower(concat("user".lastname, ' ', "user".patronymic, ' ', "user".name)) like lower(var_search)
+           or lower(concat("user".patronymic, ' ', "user".lastname, ' ', "user".name)) like lower(var_search)
+             or lower(concat("user".patronymic, ' ', "user".name, ' ', "user".lastname)) like lower(var_search)))
+        or permission.number  like var_search
+ 			or lower(subdivision.name) like lower(var_search))
+                 order by sml1.date desc;
+                 elseif var_date_start <> '' and var_date_end <> '' then
+	return query select distinct permission.id, permission.number, permission.description, permission.addition,
+		subdivision.name as subdivision_name, subdivision.id as subdivision_id, permission.untypical_work,
+		status.name as status_name, status.id as status_id, sml1.id as status_management_log_id,
+		sml1.comment as status_management_log_comment, sml1.date, sml1.date_change_status,
+        permission.emergency_minute, permission.is_emergency_activation,
+		(Select to_char(permission.period_start, 'dd.mm.YYYY')), (Select to_char(permission.period_end, 'dd.mm.YYYY'))
+		from permission
+		join subdivision on subdivision.id = permission.subdivisionid
+		join status_management_log as sml1 on sml1.permissionid =  permission.id
+		join status on status.id = sml1.statusid		
+        join user_permission on user_permission.permissionid = permission.id
+		where sml1.date = (select max(sml2.date) from status_management_log as sml2
+                             join status on status.id = sml2.statusid
+							where sml1.permissionid = sml2.permissionid
+                            and status.type_statusid = 1)
+		 and
+      (permission.id in (select permission.id from permission
+				 join date on date.permissionid = permission.id
+				 where date.date >= to_date(var_date_start, 'YYYY-MM-DD') and date.date <= to_date(var_date_end, 'YYYY-MM-DD'))
+                
+		or permission.id in (select permission.id from permission
+			 where permission.period_start <= to_date(var_date_start, 'YYYY-MM-DD') 
+			 or permission.period_end >= to_date(var_date_end, 'YYYY-MM-DD')))
+                 order by sml1.date desc;
+    elseif var_date_start <> '' and var_user_id > 0 then
+    return query select distinct permission.id, permission.number, permission.description, permission.addition,
+		subdivision.name as subdivision_name, subdivision.id as subdivision_id, permission.untypical_work,
+		status.name as status_name, status.id as status_id, sml1.id as status_management_log_id,
+		sml1.comment as status_management_log_comment, sml1.date, sml1.date_change_status,
+		permission.emergency_minute, permission.is_emergency_activation,
+		(Select to_char(permission.period_start, 'dd.mm.YYYY')), (Select to_char(permission.period_end, 'dd.mm.YYYY'))
+		from permission
+		join subdivision on subdivision.id = permission.subdivisionid
+		join status_management_log as sml1 on sml1.permissionid =  permission.id
+		join status on status.id = sml1.statusid		
+        join user_permission on user_permission.permissionid = permission.id
+		where sml1.date = (select max(sml2.date) from status_management_log as sml2
+                             join status on status.id = sml2.statusid
+							where sml1.permissionid = sml2.permissionid
+                            and status.type_statusid = 1)
+                               and user_permission.userid = var_user_id and
+		(permission.id in (select permission.id from permission
+				 join date on date.permissionid = permission.id
+				 where date.date = to_date(var_date_start, 'YYYY-MM-DD'))
+		or permission.id in (select permission.id from permission
+			 where permission.period_start <= to_date(var_date_start, 'YYYY-MM-DD')
+             and permission.period_end >= to_date(var_date_start, 'YYYY-MM-DD')))
+             and sml1.userid = var_user_id
+                 order by sml1.date desc;
+     elseif var_date_end <> '' and var_user_id > 0 then
+     return query select distinct permission.id, permission.number, permission.description, permission.addition,
+		subdivision.name as subdivision_name, subdivision.id as subdivision_id, permission.untypical_work,
+		status.name as status_name, status.id as status_id, sml1.id as status_management_log_id,
+		sml1.comment as status_management_log_comment, sml1.date, sml1.date_change_status,
+		permission.emergency_minute, permission.is_emergency_activation,
+		(Select to_char(permission.period_start, 'dd.mm.YYYY')), (Select to_char(permission.period_end, 'dd.mm.YYYY'))
+		from permission
+		join subdivision on subdivision.id = permission.subdivisionid
+		join status_management_log as sml1 on sml1.permissionid =  permission.id
+		join status on status.id = sml1.statusid		
+        join user_permission on user_permission.permissionid = permission.id
+		where sml1.date = (select max(sml2.date) from status_management_log as sml2
+                             join status on status.id = sml2.statusid
+							where sml1.permissionid = sml2.permissionid
+                            and status.type_statusid = 1)
+                               and user_permission.userid = var_user_id and
+		(permission.id in (select permission.id from permission
+				 join date on date.permissionid = permission.id
+				 where date.date = to_date(var_date_end, 'YYYY-MM-DD'))
+                
+		or permission.id in (select permission.id from permission
+			 where permission.period_start <= to_date(var_date_end, 'YYYY-MM-DD')
+             and permission.period_end >= to_date(var_date_end, 'YYYY-MM-DD')))
+             and sml1.userid = var_user_id
+                 order by sml1.date desc;
+	elseif var_date_start <> ''  then
+	return query select distinct permission.id, permission.number, permission.description, permission.addition,
+		subdivision.name as subdivision_name, subdivision.id as subdivision_id, permission.untypical_work,
+		status.name as status_name, status.id as status_id, sml1.id as status_management_log_id,
+		sml1.comment as status_management_log_comment, sml1.date, sml1.date_change_status,
+		permission.emergency_minute, permission.is_emergency_activation,
+		(Select to_char(permission.period_start, 'dd.mm.YYYY')), (Select to_char(permission.period_end, 'dd.mm.YYYY'))
+		from permission
+		join subdivision on subdivision.id = permission.subdivisionid
+		join status_management_log as sml1 on sml1.permissionid =  permission.id
+		join status on status.id = sml1.statusid		
+        join user_permission on user_permission.permissionid = permission.id
+		where sml1.date = (select max(sml2.date) from status_management_log as sml2
+                             join status on status.id = sml2.statusid
+							where sml1.permissionid = sml2.permissionid
+                            and status.type_statusid = 1)
+                            
+		and (permission.id in (select permission.id from permission
+				 join date on date.permissionid = permission.id
+				 where date.date = to_date(var_date_start, 'YYYY-MM-DD'))
+                
+		or permission.id in (select permission.id from permission
+			 where permission.period_start <= to_date(var_date_start, 'YYYY-MM-DD')
+             and permission.period_end >= to_date(var_date_start, 'YYYY-MM-DD')))
+                 order by sml1.date desc;
+    elseif var_date_end <> ''  then
+	return query select distinct permission.id, permission.number, permission.description, permission.addition,
+		subdivision.name as subdivision_name, subdivision.id as subdivision_id, permission.untypical_work,
+		status.name as status_name, status.id as status_id, sml1.id as status_management_log_id,
+		sml1.comment as status_management_log_comment, sml1.date, sml1.date_change_status,
+		permission.emergency_minute, permission.is_emergency_activation,
+		(Select to_char(permission.period_start, 'dd.mm.YYYY')), (Select to_char(permission.period_end, 'dd.mm.YYYY'))
+		from permission
+		join subdivision on subdivision.id = permission.subdivisionid
+		join status_management_log as sml1 on sml1.permissionid =  permission.id
+		join status on status.id = sml1.statusid		
+        join user_permission on user_permission.permissionid = permission.id
+		where sml1.date = (select max(sml2.date) from status_management_log as sml2
+                             join status on status.id = sml2.statusid
+							where sml1.permissionid = sml2.permissionid
+                            and status.type_statusid = 1)
+                              
+		and (permission.id in (select permission.id from permission
+				 join date on date.permissionid = permission.id
+				 where date.date = to_date(var_date_end, 'YYYY-MM-DD'))
+                
+		or permission.id in (select permission.id from permission
+			 where permission.period_start <= to_date(var_date_end, 'YYYY-MM-DD')
+             and permission.period_end >= to_date(var_date_end, 'YYYY-MM-DD')))
+                 order by sml1.date desc;
+	elseIF var_status_id > 0 THEN
+        return query select distinct permission.id, permission.number, permission.description, permission.addition,
+		subdivision.name as subdivision_name, subdivision.id as subdivision_id, permission.untypical_work,
+		status.name as status_name, status.id as status_id, sml1.id as status_management_log_id,
+		sml1.comment as status_management_log_comment, sml1.date, sml1.date_change_status,
+		permission.emergency_minute, permission.is_emergency_activation,
+		(Select to_char(permission.period_start, 'dd.mm.YYYY')), (Select to_char(permission.period_end, 'dd.mm.YYYY'))
+		from permission
+		join user_permission on user_permission.permissionid = permission.id
+		join subdivision on subdivision.id = permission.subdivisionid
+		join status_management_log as sml1 on sml1.permissionid =  permission.id
+		join status on status.id = sml1.statusid
+		where sml1.date = (select max(sml2.date) from status_management_log as sml2
+                               where sml1.permissionid = sml2.permissionid)
+         and status.id = var_status_id
+         order by sml1.date desc;
+	elseIF var_number <> '' THEN
+        return query select distinct permission.id, permission.number, permission.description, permission.addition,
+		subdivision.name as subdivision_name, subdivision.id as subdivision_id, permission.untypical_work,
+		status.name as status_name, status.id as status_id, status_management_log.id as status_management_log_id,
+		status_management_log.comment as status_management_log_comment, status_management_log.date, status_management_log.date_change_status,
+		(Select to_char(permission.period_start, 'dd.mm.YYYY')), (Select to_char(permission.period_end, 'dd.mm.YYYY'))
+		from permission
+		join subdivision on subdivision.id = permission.subdivisionid
+		join status_management_log on status_management_log.permissionid =  permission.id
+		join status on status.id = status_management_log.statusid
+		where permission.number = var_number;
+    elseIF var_user_id > 0 THEN
+		if var_search = '' then
+			return query select distinct permission.id, permission.number, permission.description, permission.addition,
+			subdivision.name as subdivision_name, subdivision.id as subdivision_id, permission.untypical_work,
+			status.name as status_name, status.id as status_id, sml1.id as status_management_log_id,
+		sml1.comment as status_management_log_comment, sml1.date, sml1.date_change_status,
+		permission.emergency_minute, permission.is_emergency_activation,
+		(Select to_char(permission.period_start, 'dd.mm.YYYY')), (Select to_char(permission.period_end, 'dd.mm.YYYY'))
+			from permission
+			join subdivision on subdivision.id = permission.subdivisionid
+			join status_management_log as sml1 on sml1.permissionid =  permission.id
+			join status on status.id = sml1.statusid
+			join user_permission on user_permission.permissionid = permission.id
+			join type_person on type_person.id = user_permission.type_personid
+			where user_permission.userid = var_user_id and type_person.id = 1
+			and sml1.date = (select max(sml2.date) from status_management_log as sml2
+                             join status on status.id = sml2.statusid
+							where sml1.permissionid = sml2.permissionid
+                            and status.type_statusid = 1)
+            order by sml1.date desc;
+		else
+			return query select distinct permission.id, permission.number, permission.description, permission.addition,
+			subdivision.name as subdivision_name, subdivision.id as subdivision_id, permission.untypical_work,
+			status.name as status_name, status.id as status_id, sml1.id as status_management_log_id,
+		sml1.comment as status_management_log_comment, sml1.date, sml1.date_change_status,
+		permission.emergency_minute, permission.is_emergency_activation,
+		(Select to_char(permission.period_start, 'dd.mm.YYYY')), (Select to_char(permission.period_end, 'dd.mm.YYYY'))
+			from permission
+			join subdivision on subdivision.id = permission.subdivisionid
+			join status_management_log as sml1 on sml1.permissionid =  permission.id
+			join status on status.id = sml1.statusid
+			join user_permission on user_permission.permissionid = permission.id
+			join type_person on type_person.id = user_permission.type_personid
+            join "user" on "user".id = user_permission.userid
+			where sml1.date = (select max(sml2.date) from status_management_log as sml2
+                             join status on status.id = sml2.statusid
+							where sml1.permissionid = sml2.permissionid
+                            and status.type_statusid = 1)
+            and permission.id in (select user_permission.permissionid from user_permission
+							 where user_permission.userid = var_user_id) and
+ ((type_person.id = 3 and (lower("user".name) like lower(var_search) or lower("user".lastname) like lower(var_search) or lower("user".patronymic) like lower(var_search) 
+   or lower(concat("user".lastname, ' ', "user".name)) like lower(var_search)
+  or lower(concat("user".name, ' ', "user".lastname)) like lower(var_search)
+  or lower(concat("user".name, ' ', "user".patronymic)) like lower(var_search)
+    or lower(concat("user".patronymic, ' ', "user".name)) like lower(var_search)
+   or lower(concat("user".lastname, ' ', "user".name, ' ', "user".patronymic)) like lower(var_search)
+     or lower(concat("user".name, ' ', "user".lastname, ' ', "user".patronymic)) like lower(var_search)
+       or lower(concat("user".name, ' ', "user".patronymic, ' ', "user".lastname)) like lower(var_search)
+         or lower(concat("user".lastname, ' ', "user".patronymic, ' ', "user".name)) like lower(var_search)
+           or lower(concat("user".patronymic, ' ', "user".lastname, ' ', "user".name)) like lower(var_search)
+             or lower(concat("user".patronymic, ' ', "user".name, ' ', "user".lastname)) like lower(var_search)))
+        or permission.number  like var_search
+ 			or lower(subdivision.name) like lower(var_search))
+            order by sml1.date desc;
+		end if;
+    else 
+    return query select distinct permission.id, permission.number, permission.description, permission.addition,
+			subdivision.name as subdivision_name, subdivision.id as subdivision_id, permission.untypical_work,
+			status.name as status_name, status.id as status_id, sml1.id as status_management_log_id,
+		sml1.comment as status_management_log_comment, sml1.date, sml1.date_change_status,
+		permission.emergency_minute, permission.is_emergency_activation,
+		(Select to_char(permission.period_start, 'dd.mm.YYYY')), (Select to_char(permission.period_end, 'dd.mm.YYYY'))
+			from permission
+			join subdivision on subdivision.id = permission.subdivisionid
+			join status_management_log as sml1 on sml1.permissionid =  permission.id
+			join status on status.id = sml1.statusid
+			join user_permission on user_permission.permissionid = permission.id
+			join type_person on type_person.id = user_permission.type_personid
+            join "user" on "user".id = user_permission.userid
+			where sml1.date = (select max(sml2.date) from status_management_log as sml2
+                             join status on status.id = sml2.statusid
+							where sml1.permissionid = sml2.permissionid
+                            and status.type_statusid = 1)
+            and permission.id in (select permission.id from permission
+                                  join status_management_log on status_management_log.permissionid = permission.id
+                                  join status on status.id = status_management_log.statusid
+							 where status.id = 3) and
+ ((type_person.id = 3 and (lower("user".name) like lower(var_search) or lower("user".lastname) like lower(var_search) or lower("user".patronymic) like lower(var_search) 
+   or lower(concat("user".lastname, ' ', "user".name)) like lower(var_search)
+  or lower(concat("user".name, ' ', "user".lastname)) like lower(var_search)
+  or lower(concat("user".name, ' ', "user".patronymic)) like lower(var_search)
+    or lower(concat("user".patronymic, ' ', "user".name)) like lower(var_search)
+   or lower(concat("user".lastname, ' ', "user".name, ' ', "user".patronymic)) like lower(var_search)
+     or lower(concat("user".name, ' ', "user".lastname, ' ', "user".patronymic)) like lower(var_search)
+       or lower(concat("user".name, ' ', "user".patronymic, ' ', "user".lastname)) like lower(var_search)
+         or lower(concat("user".lastname, ' ', "user".patronymic, ' ', "user".name)) like lower(var_search)
+           or lower(concat("user".patronymic, ' ', "user".lastname, ' ', "user".name)) like lower(var_search)
+             or lower(concat("user".patronymic, ' ', "user".name, ' ', "user".lastname)) like lower(var_search)))
+        or permission.number  like var_search
+ 			or lower(subdivision.name) like lower(var_search))
+            order by sml1.date desc;
+    END IF;
+end;
+$BODY$;
+
+3)CREATE OR REPLACE FUNCTION public.add_typical_work(
+	var_permission_id integer,
+	var_typical_work_id integer,
+	var_description text)
+    RETURNS SETOF void 
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE PARALLEL UNSAFE
+    ROWS 1000
+
+AS $BODY$
+begin
+insert into permission__typical_work values(var_permission_id, var_typical_work_id, var_description);
+end;
+$BODY$;
+
+4)CREATE OR REPLACE FUNCTION public.add_permission(
+	var_id integer,
+	var_number character varying,
+	var_description text,
+	var_addition text,
+	var_subdivision_id integer,
+	var_untypical_work text,
+	var_emergency_minute integer,
+	var_is_emergency_activation boolean,
+	var_period_start date,
+	var_period_end date)
+    RETURNS TABLE(id integer) 
+    LANGUAGE 'sql'
+    COST 100
+    VOLATILE PARALLEL UNSAFE
+    ROWS 1000
+
+AS $BODY$
+insert into permission( number, description, addition, subdivisionid, untypical_work, emergency_minute, is_emergency_activation,
+					  period_start, period_end) values(var_number,
+							  var_description, var_addition, var_subdivision_id, var_untypical_work,
+							  var_emergency_minute, var_is_emergency_activation, var_period_start, var_period_end) returning permission.id;
+$BODY$;
+
+5)CREATE OR REPLACE FUNCTION public.del_typical_work(
+	var_permission_id integer,
+	var_typical_work_id integer)
+    RETURNS SETOF void 
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE PARALLEL UNSAFE
+    ROWS 1000
+
+AS $BODY$
+begin
+if var_permission_id > 0 and var_typical_work_id > 0 then
+delete from permission__typical_work 
+where permission__typical_work.permissionid = var_permission_id
+and permission__typical_work.typical_workid = var_typical_work_id;
+elseif var_permission_id > 0 then
+delete from permission__typical_work 
+where permission__typical_work.permissionid = var_permission_id;
+else
+delete from permission__typical_work 
+where permission__typical_work.typical_workid = var_typical_work_id;
+end if;
+end;
+$BODY$;

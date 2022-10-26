@@ -1,0 +1,69 @@
+1) SELECT name_question, name_answer, 
+IF(is_correct, 'Верно', 'Неверно') AS Результат
+FROM attempt a
+JOIN student st
+ON st.student_id = a.student_id AND name_student = 'Семенов Иван'
+JOIN subject su
+ON su.subject_id = a.subject_id AND name_subject = 'Основы SQL'
+JOIN testing USING(attempt_id)
+JOIN question USING(question_id)
+JOIN answer USING(answer_id)
+WHERE date_attempt = '2020-05-17';
+
+
+2)SELECT name_student, name_subject, date_attempt,
+ROUND(SUM(is_correct) / 3 * 100, 2) AS Результат
+FROM student
+JOIN attempt a USING(student_id)
+JOIN testing USING(attempt_id)
+JOIN subject USING(subject_id)
+JOIN question USING(question_id)
+JOIN answer USING(answer_id)
+GROUP BY name_student, name_subject, date_attempt
+ORDER BY name_student, date_attempt DESC;
+
+3)INSERT INTO testing(attempt_id, question_id, answer_id)
+SELECT attempt_id, question_id, Null
+FROM question q
+JOIN attempt a
+ON a.subject_id = q.subject_id
+AND attempt_id = (SELECT MAX(attempt_id) FROM attempt)
+ORDER BY RAND()
+LIMIT 3;
+
+4)UPDATE attempt a
+SET result = (SELECT * FROM (SELECT ROUND(100 / 3 * SUM(is_correct), 2)
+              FROM testing
+              JOIN attempt a1 USING(attempt_id)
+              JOIN answer USING(answer_id)
+              WHERE a1.attempt_id = a.attempt_id
+              GROUP BY attempt_id) AS result)
+WHERE result IS Null;
+
+5)SELECT name_subject, COUNT(result) AS Количество,
+IF(MAX(result) > 0, MAX(result), 0) AS Максимум,
+IF(MIN(result) > 0, MIN(result), 0) AS Минимум, 
+IF(AVG(result) > 0, ROUND(AVG(result), 1), 0) AS Среднее
+FROM subject
+LEFT JOIN enrollee_subject USING(subject_id)
+GROUP BY name_subject
+ORDER BY name_subject;
+
+6)SELECT name_program
+FROM program_subject
+JOIN subject USING(subject_id)
+JOIN program USING(program_id)
+WHERE name_subject = 'Информатика' 
+OR name_subject = 'Математика'
+GROUP BY name_program
+HAVING COUNT(*) = 2
+ORDER BY name_program;
+
+7)SELECT MONTHNAME(date_first) AS Месяц, COUNT(date_first) AS Количество
+FROM trip
+GROUP BY MONTHNAME(date_first)
+ORDER BY COUNT(date_first) DESC, MONTHNAME(date_first)
+
+8)SELECT name, city, date_first, date_last
+FROM trip
+WHERE DATEDIFF(date_last, date_first) = (SELECT MIN(DATEDIFF(date_last, date_first)) FROM trip)
